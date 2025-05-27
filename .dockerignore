@@ -1,0 +1,27 @@
+# Ignore node_modules and logs
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Ignore Git
+.git
+.gitignore
+
+# Ignore Docker and CI/CD config files
+.dockerignore
+Dockerfile
+docker-compose.yaml
+Jenkinsfile
+sonar-project.properties
+
+# Ignore Kubernetes and Terraform config
+k8s/
+kustomize/
+terraform/
+
+# Ignore documentation
+README.md
+
+# OS-specific files
+.DS_Store
+Thumbs.db
