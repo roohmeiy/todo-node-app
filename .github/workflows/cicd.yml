@@ -108,7 +108,6 @@ jobs:
   deploy:
     runs-on: self-hosted
     needs: [build-and-push, image-security]
-    environment: production
     
     steps:
     - name: Pull and run Docker container
