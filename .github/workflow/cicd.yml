@@ -1,0 +1,117 @@
+name: Deploy Node App
+
+on:
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: todo-node-app
+
+jobs:
+  code-quality:
+    runs-on: self-hosted
+    
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+    
+    - name: SonarQube Scanner
+      uses: sonarsource/sonarqube-scan-action@master
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      with:
+        args: -Dsonar.projectKey=todo-node-app -Dsonar.projectName=todo-node-app
+    
+    - name: SonarQube Quality Gate
+      uses: sonarqube-quality-gate-action@master
+      timeout-minutes: 5
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: code-quality
+    
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+    
+    - name: OWASP Dependency Check
+      uses: dependency-check/Dependency-Check_Action@main
+      with:
+        project: 'todo-node-app'
+        path: '.'
+        format: 'XML'
+    
+    - name: Upload Dependency Check Report
+      uses: actions/upload-artifact@v4
+      with:
+        name: dependency-check-report
+        path: reports/
+
+  build-and-push:
+    runs-on: ubuntu-latest
+    needs: [code-quality, security-scan]
+    outputs:
+      image-tag: ${{ github.sha }}
+    
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+    
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_HUB_USER }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+    
+    - name: Build and Push Docker Image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_HUB_USER }}/${{ env.IMAGE_NAME }}:latest
+          ${{ secrets.DOCKER_HUB_USER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+        platforms: linux/amd64
+      env:
+        DOCKER_BUILDKIT: 1
+
+  image-security:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    
+    steps:
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_HUB_USER }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+    
+    - name: Docker Scout Vulnerability Scan
+      uses: docker/scout-action@v1
+      with:
+        command: cves
+        image: ${{ secrets.DOCKER_HUB_USER }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-push.outputs.image-tag }}
+        sarif-file: scout-report.sarif
+        summary: true
+    
+    - name: Upload Scout SARIF Report
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: scout-report.sarif
+
+  deploy:
+    runs-on: self-hosted
+    needs: [build-and-push, image-security]
+    environment: development
+    
+    steps:
+    - name: Pull and run Docker container
+      run: |
+        docker pull ${{ secrets.DOCKER_HUB_USER }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-push.outputs.image-tag }}
+        docker rm -f node_container || true
+        docker run -d --name node_container -p 8000:8000 \
+        ${{ secrets.DOCKER_HUB_USER }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-push.outputs.image-tag }}
