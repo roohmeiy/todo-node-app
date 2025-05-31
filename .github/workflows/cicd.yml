@@ -95,7 +95,7 @@ jobs:
       run: |
         docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
         aquasec/trivy image --format table --exit-code 1 \
-        ${{ secrets.DOCKEHUB_USER }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-push.outputs.image-tag }}
+        ${{ secrets.DOCKERHUB_USER }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-push.outputs.image-tag }}
 
   deploy:
     runs-on: self-hosted
