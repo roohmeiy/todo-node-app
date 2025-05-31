@@ -11,23 +11,20 @@ jobs:
     runs-on: self-hosted
     
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0  # Shallow clones should be disabled for better relevancy of analysis
     
-    - name: SonarQube Scanner
-      uses: sonarsource/sonarqube-scan-action@master
+    - uses: sonarsource/sonarqube-scan-action@master
       env:
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-      with:
-        args: -Dsonar.projectKey=todo-node-app -Dsonar.projectName=todo-node-app
-    
-    - name: SonarQube Quality Gate
-      uses: sonarqube-quality-gate-action@master
+
+    - uses: sonarsource/sonarqube-quality-gate-action@master
       timeout-minutes: 5
       env:
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
 
   security-scan:
     runs-on: ubuntu-latest
@@ -63,7 +60,7 @@ jobs:
     - name: Login to Docker Hub
       uses: docker/login-action@v3
       with:
-        username: ${{ secrets.DOCKER_HUB_USER }}
+        username: ${{ secrets.DOCKERHUB_USER }}
         password: ${{ secrets.DOCKER_PASSWORD }}
     
     - name: Build and Push Docker Image
@@ -72,8 +69,8 @@ jobs:
         context: .
         push: true
         tags: |
-          ${{ secrets.DOCKER_HUB_USER }}/${{ env.IMAGE_NAME }}:latest
-          ${{ secrets.DOCKER_HUB_USER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          ${{ secrets.DOCKERHUB_USER }}/${{ env.IMAGE_NAME }}:latest
+          ${{ secrets.DOCKERHUB_USER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
         platforms: linux/amd64
       env:
         DOCKER_BUILDKIT: 1
@@ -86,14 +83,14 @@ jobs:
     - name: Login to Docker Hub
       uses: docker/login-action@v3
       with:
-        username: ${{ secrets.DOCKER_HUB_USER }}
+        username: ${{ secrets.DOCKERHUB_USER }}
         password: ${{ secrets.DOCKER_PASSWORD }}
     
     - name: Docker Scout Vulnerability Scan
       uses: docker/scout-action@v1
       with:
         command: cves
-        image: ${{ secrets.DOCKER_HUB_USER }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-push.outputs.image-tag }}
+        image: ${{ secrets.DOCKERHUB_USER }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-push.outputs.image-tag }}
         sarif-file: scout-report.sarif
         summary: true
     
@@ -106,12 +103,11 @@ jobs:
   deploy:
     runs-on: self-hosted
     needs: [build-and-push, image-security]
-    environment: development
     
     steps:
     - name: Pull and run Docker container
       run: |
-        docker pull ${{ secrets.DOCKER_HUB_USER }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-push.outputs.image-tag }}
+        docker pull ${{ secrets.DOCKERHUB_USER }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-push.outputs.image-tag }}
         docker rm -f node_container || true
         docker run -d --name node_container -p 8000:8000 \
-        ${{ secrets.DOCKER_HUB_USER }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-push.outputs.image-tag }}
+        ${{ secrets.DOCKERHUB_USER }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-push.outputs.image-tag }}
