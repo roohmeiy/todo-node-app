@@ -11,20 +11,25 @@ jobs:
     runs-on: self-hosted
     
     steps:
-    - uses: actions/checkout@v2
+    - name: Checkout Code
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0  # Shallow clones should be disabled for better relevancy of analysis
     
-    - uses: sonarsource/sonarqube-scan-action@master
+    - name: SonarQube Scanner
+      uses: sonarsource/sonarqube-scan-action@master
       env:
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      with:
+        args: -Dsonar.projectKey=nodetodo -Dsonar.projectName=nodetodo
 
-    - uses: sonarsource/sonarqube-quality-gate-action@master
+    - name: SonarQube Quality Gate
+      uses: sonarsource/sonarqube-quality-gate-action@master
       timeout-minutes: 5
       env:
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
+        SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
   security-scan:
     runs-on: ubuntu-latest
@@ -103,6 +108,7 @@ jobs:
   deploy:
     runs-on: self-hosted
     needs: [build-and-push, image-security]
+    environment: production
     
     steps:
     - name: Pull and run Docker container
@@ -111,3 +117,4 @@ jobs:
         docker rm -f node_container || true
         docker run -d --name node_container -p 8000:8000 \
         ${{ secrets.DOCKERHUB_USER }}/${{ env.IMAGE_NAME }}:${{ needs.build-and-push.outputs.image-tag }}
+        
