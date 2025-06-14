@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: todo-node-app-deployment
+  namespace: test
+  labels:
+    app: todo-node-app
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: todo-node-app
+  template:
+    metadata:
+      labels:
+        app: todo-node-app
+    spec:
+      containers:
+      - name: todo-node-app
+        image: roohmeiy/todo-node-app:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
