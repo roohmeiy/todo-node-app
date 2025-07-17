@@ -17,5 +17,5 @@ apt-get install -y curl git
 ``` bash
 docker run -itd --name SonarQube-Server -p 9000:9000 sonarqube:lts-community
 ```
-
+ 
 ![img1](images/img1.png "img1")
